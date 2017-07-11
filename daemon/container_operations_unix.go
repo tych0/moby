@@ -165,7 +165,8 @@ func (daemon *Daemon) setupSecretDir(c *container.Container) (setupErr error) {
 	}()
 
 	tmpfsOwnership := fmt.Sprintf("uid=%d,gid=%d", rootIDs.UID, rootIDs.GID)
-	if err := mount.Mount("tmpfs", localMountPath, "tmpfs", "nodev,nosuid,noexec,"+tmpfsOwnership); err != nil {
+	mntOpts := "nodev,nosuid,noexec,"+tmpfsOwnership
+	if err := mount.Mount("tmpfs", localMountPath, "tmpfs", mntOpts); err != nil {
 		return errors.Wrap(err, "unable to setup secret mount")
 	}
 
@@ -216,7 +217,7 @@ func (daemon *Daemon) setupSecretDir(c *container.Container) (setupErr error) {
 	label.Relabel(localMountPath, c.MountLabel, false)
 
 	// remount secrets ro
-	if err := mount.Mount("tmpfs", localMountPath, "tmpfs", "remount,ro,"+tmpfsOwnership); err != nil {
+	if err := mount.Mount("tmpfs", localMountPath, "tmpfs", "remount,ro,"+mntOpts); err != nil {
 		return errors.Wrap(err, "unable to remount secret dir as readonly")
 	}
 
