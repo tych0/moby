@@ -981,7 +981,7 @@ func (s *DockerCLIRunSuite) TestRunSeccompProfileDenyCloneUserns(c *testing.T) {
 
 	icmd.RunCommand(dockerBinary, "run", "syscall-test", "userns-test", "id").Assert(c, icmd.Expected{
 		ExitCode: 1,
-		Err:      "clone failed: Operation not permitted",
+		Err:      "clone failed: Function not implemented",
 	})
 }
 
@@ -1032,7 +1032,7 @@ func (s *DockerCLIRunSuite) TestRunSeccompDefaultProfileAcct(c *testing.T) {
 	ensureSyscallTest(testutil.GetContext(c), c)
 
 	out, _, err := dockerCmdWithError("run", "syscall-test", "acct-test")
-	if err == nil || !strings.Contains(out, "Operation not permitted") {
+	if err == nil || !strings.Contains(out, "Function not implemented") {
 		c.Fatalf("test 0: expected Operation not permitted, got: %s", out)
 	}
 
@@ -1062,7 +1062,7 @@ func (s *DockerCLIRunSuite) TestRunSeccompDefaultProfileNS(c *testing.T) {
 	ensureSyscallTest(testutil.GetContext(c), c)
 
 	out, _, err := dockerCmdWithError("run", "syscall-test", "ns-test", "echo", "hello0")
-	if err == nil || !strings.Contains(out, "Operation not permitted") {
+	if err == nil || !strings.Contains(out, "Function not implemented") {
 		c.Fatalf("test 0: expected Operation not permitted, got: %s", out)
 	}
 
@@ -1262,15 +1262,28 @@ func (s *DockerCLIRunSuite) TestUserNoEffectiveCapabilitiesChroot(c *testing.T) 
 	testRequires(c, DaemonIsLinux, testEnv.IsLocalDaemon)
 	ensureSyscallTest(testutil.GetContext(c), c)
 
+	const jsonData = `{
+	"defaultAction": "SCMP_ACT_ALLOW",
+	"syscalls": []
+}`
+	// need to explicitly allow chroot via seccomp, since we're testing the capability
+	tmpFile, err := os.CreateTemp("", "profile.json")
+	assert.NilError(c, err)
+	defer tmpFile.Close()
+
+	if _, err := tmpFile.WriteString(jsonData); err != nil {
+		c.Fatal(err)
+	}
+
 	// test that a root user has default capability CAP_SYS_CHROOT
-	cli.DockerCmd(c, "run", "busybox", "chroot", "/", "/bin/true")
+	cli.DockerCmd(c, "run", "--security-opt", "seccomp="+tmpFile.Name(), "busybox", "chroot", "/", "/bin/true")
 	// test that non root user does not have default capability CAP_SYS_CHROOT
-	icmd.RunCommand(dockerBinary, "run", "--user", "1000:1000", "busybox", "chroot", "/", "/bin/true").Assert(c, icmd.Expected{
+	icmd.RunCommand(dockerBinary, "run", "--security-opt", "seccomp="+tmpFile.Name(), "--user", "1000:1000", "busybox", "chroot", "/", "/bin/true").Assert(c, icmd.Expected{
 		ExitCode: 1,
 		Err:      "Operation not permitted",
 	})
 	// test that root user can drop default capability CAP_SYS_CHROOT
-	icmd.RunCommand(dockerBinary, "run", "--cap-drop", "sys_chroot", "busybox", "chroot", "/", "/bin/true").Assert(c, icmd.Expected{
+	icmd.RunCommand(dockerBinary, "run", "--security-opt", "seccomp="+tmpFile.Name(), "--cap-drop", "sys_chroot", "busybox", "chroot", "/", "/bin/true").Assert(c, icmd.Expected{
 		ExitCode: 1,
 		Err:      "Operation not permitted",
 	})

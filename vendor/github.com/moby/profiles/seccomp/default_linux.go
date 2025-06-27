@@ -829,11 +829,10 @@ func DefaultProfile() *Seccomp {
 		},
 	}
 
-	errnoRet := uint(unix.EPERM)
 	return &Seccomp{
 		LinuxSeccomp: specs.LinuxSeccomp{
 			DefaultAction:   specs.ActErrno,
-			DefaultErrnoRet: &errnoRet,
+			DefaultErrnoRet: &nosys,
 		},
 		ArchMap:  arches(),
 		Syscalls: syscalls,
